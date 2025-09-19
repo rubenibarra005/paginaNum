@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asignador de valores por frase</title>
+    <style>
+        :root {
+            --color-primary: #007bff;
+            --color-secondary: #6c757d;
+            --color-success: #28a745;
+            --color-warning: #ffc107;
+            --color-danger: #dc3545;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #343a40;
+            --border-color: #dee2e6;
+            --shadow-light: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 100%;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: var(--shadow-light);
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--color-primary);
+            margin-bottom: 20px;
+        }
+
+        .card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background-color 0.2s, box-shadow 0.2s;
+        }
+
+        button.primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+
+        button.primary:hover {
+            background-color: #0056b3;
+        }
+        
+        button.secondary {
+            background-color: var(--color-secondary);
+            color: white;
+        }
+
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        button.success {
+            background-color: var(--color-success);
+            color: white;
+        }
+
+        button.success:hover {
+            background-color: #218838;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+
+        .alert.warning {
+            background-color: var(--color-warning);
+            color: #856404;
+        }
+        .alert.danger {
+            background-color: var(--color-danger);
+            color: white;
+        }
+
+        #dictionaryTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        #dictionaryTable th,
+        #dictionaryTable td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: center;
+        }
+        
+        #dictionaryTable th {
+            background-color: #e9ecef;
+        }
+
+        #resultContainer {
+            margin-top: 20px;
+        }
+
+        #resultContainer h3 {
+            margin-bottom: 10px;
+            color: var(--color-primary);
+        }
+
+        #desglose p {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 5px;
+        }
+
+        .message-container {
+            margin-top: 10px;
+        }
+        
+        #historyTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        #historyTable th,
+        #historyTable td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: center;
+        }
+        
+        #historyTable th {
+            background-color: #e9ecef;
+        }
+        
+        /* Ocultar elementos inicialmente */
+        #dictionaryResult, #resultContainer, #extraButtons, #saveToHistoryBtn, #historySection {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <main class="container">
+        <header>
+            <h1>Asignador de valores por frase</h1>
+        </header>
+
+        <section class="card">
+            <div class="form-group">
+                <label for="seedPhrase">Frase semilla:</label>
+                <input type="text" id="seedPhrase" placeholder="Ej.: 'El veloz murciélago'..." aria-label="Frase semilla">
+                <div id="seedPhraseMessage" class="message-container" role="alert" aria-live="polite"></div>
+            </div>
+            <div class="form-group">
+                <label for="alphabetSelect">Seleccionar alfabeto:</label>
+                <select id="alphabetSelect">
+                    <option value="a-z">a-z (inglés, por defecto)</option>
+                    <option value="a-z-ñ">a-z + ñ (español)</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button id="generateDictionaryBtn" class="primary">Generar diccionario</button>
+                <button id="resetBtn" class="secondary">Reiniciar</button>
+            </div>
+        </section>
+
+        <section class="card" id="dictionaryResult">
+            <h2>Diccionario generado</h2>
+            <div class="btn-group" id="extraButtons">
+                <button id="copyJsonBtn" class="secondary">Copiar diccionario (JSON)</button>
+                <button id="downloadJsonBtn" class="secondary">Descargar diccionario (JSON)</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="dictionaryTable">
+                    <thead>
+                        <tr>
+                            <th>Letra</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <div class="form-group">
+                <label for="targetWord">Palabra a evaluar:</label>
+                <input type="text" id="targetWord" placeholder="Ej.: 'murcielago'..." disabled aria-label="Palabra a evaluar">
+                <div id="targetWordMessage" class="message-container" role="alert" aria-live="polite"></div>
+            </div>
+            <button id="calculateValueBtn" class="primary" disabled>Calcular valor</button>
+        </section>
+
+        <section class="card" id="resultContainer">
+            <h2>Resultado</h2>
+            <div id="calculationResult"></div>
+            <div id="desglose"></div>
+            <button id="saveToHistoryBtn" class="success" style="margin-top: 15px;">Guardar en historial</button>
+        </section>
+
+        <section class="card" id="historySection">
+            <h2>Historial de cálculos</h2>
+            <button id="clearHistoryBtn" class="secondary">Limpiar historial</button>
+            <div style="overflow-x: auto;">
+                <table id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>Frase Semilla</th>
+                            <th>Palabra</th>
+                            <th>Valor</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // DOM Elements
+        const seedPhraseInput = document.getElementById('seedPhrase');
+        const targetWordInput = document.getElementById('targetWord');
+        const generateDictionaryBtn = document.getElementById('generateDictionaryBtn');
+        const calculateValueBtn = document.getElementById('calculateValueBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const copyJsonBtn = document.getElementById('copyJsonBtn');
+        const downloadJsonBtn = document.getElementById('downloadJsonBtn');
+        const dictionaryTableBody = document.querySelector('#dictionaryTable tbody');
+        const dictionaryResultSection = document.getElementById('dictionaryResult');
+        const resultContainerSection = document.getElementById('resultContainer');
+        const extraButtonsContainer = document.getElementById('extraButtons');
+        const calculationResultDiv = document.getElementById('calculationResult');
+        const desgloseDiv = document.getElementById('desglose');
+        const alphabetSelect = document.getElementById('alphabetSelect');
+        const saveToHistoryBtn = document.getElementById('saveToHistoryBtn');
+        const historySection = document.getElementById('historySection');
+        const historyTableBody = document.querySelector('#historyTable tbody');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        // Global state
+        let dictionary = {};
+        let currentSeedPhrase = '';
+        let currentTargetWord = '';
+        let currentResult = null;
+        const baseAlphabets = {
+            'a-z': 'abcdefghijklmnopqrstuvwxyz',
+            'a-z-ñ': 'abcdefghijklmnopqrstuvwxyzñ'
+        };
+
+        // Utility function to normalize text (lowercase and remove diacritics)
+        const normalizeText = (text) => {
+            return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        };
+
+        // Validation message handler
+        const showMessage = (element, message, type) => {
+            const messageDiv = document.getElementById(element.id + 'Message');
+            if (messageDiv) {
+                messageDiv.textContent = message;
+                messageDiv.className = `message-container alert ${type}`;
+                messageDiv.style.display = 'block';
+            }
+        };
+
+        const hideMessage = (element) => {
+            const messageDiv = document.getElementById(element.id + 'Message');
+            if (messageDiv) {
+                messageDiv.textContent = '';
+                messageDiv.style.display = 'none';
+            }
+        };
+
+        // Core logic: generate the letter-value dictionary
+        const generateDictionary = () => {
+            const seedPhrase = seedPhraseInput.value;
+            const normalizedPhrase = normalizeText(seedPhrase);
+            const selectedAlphabetKey = alphabetSelect.value;
+            const fullAlphabet = baseAlphabets[selectedAlphabetKey];
+            const uniqueLetters = new Set();
+            let ignoredCount = 0;
+
+            dictionary = {};
+            let value = 1;
+
+            // Process seed phrase
+            for (const char of normalizedPhrase) {
+                if (fullAlphabet.includes(char) && !uniqueLetters.has(char)) {
+                    uniqueLetters.add(char);
+                    dictionary[char] = value++;
+                } else if (!fullAlphabet.includes(char) && char !== ' ') {
+                    ignoredCount++;
+                }
+            }
+
+            // Complete the dictionary with the rest of the alphabet
+            for (const char of fullAlphabet) {
+                if (!uniqueLetters.has(char)) {
+                    dictionary[char] = value++;
+                }
+            }
+
+            // Display dictionary in a table
+            displayDictionary();
+
+            // Display messages
+            if (ignoredCount > 0) {
+                showMessage(seedPhraseInput, `Se ignoraron ${ignoredCount} caracteres no alfabéticos.`, 'warning');
+            } else {
+                hideMessage(seedPhraseInput);
+            }
+            
+            currentSeedPhrase = seedPhrase;
+        };
+
+        const displayDictionary = () => {
+            dictionaryTableBody.innerHTML = '';
+            // Convert dictionary to an array of [key, value] pairs and sort by value
+            const sortedEntries = Object.entries(dictionary).sort((a, b) => a[1] - b[1]);
+
+            sortedEntries.forEach(([letter, value]) => {
+                const row = dictionaryTableBody.insertRow();
+                row.insertCell(0).textContent = letter;
+                row.insertCell(1).textContent = value;
+            });
+            dictionaryResultSection.style.display = 'block';
+            extraButtonsContainer.style.display = 'flex';
+        };
+
+        // Core logic: calculate the word's value
+        const calculateValue = () => {
+            const targetWord = targetWordInput.value;
+            const normalizedWord = normalizeText(targetWord);
+            let totalValue = 0;
+            let breakdown = [];
+            let ignoredLetters = [];
+            const selectedAlphabetKey = alphabetSelect.value;
+            const fullAlphabet = baseAlphabets[selectedAlphabetKey];
+
+            if (Object.keys(dictionary).length === 0) {
+                showMessage(targetWordInput, "Primero debes generar el diccionario.", 'danger');
+                return;
+            }
+
+            if (!targetWord.trim()) {
+                showMessage(targetWordInput, "Por favor, ingresa una palabra.", 'warning');
+                return;
+            }
+
+            for (const char of normalizedWord) {
+                if (dictionary.hasOwnProperty(char)) {
+                    const value = dictionary[char];
+                    totalValue += value;
+                    breakdown.push(`${char}(${value})`);
+                } else if (fullAlphabet.includes(char)) {
+                    // This case should not happen if the dictionary is complete
+                } else if (char !== ' ') {
+                    ignoredLetters.push(char);
+                }
+            }
+
+            // Display results
+            currentResult = totalValue;
+            currentTargetWord = targetWord;
+            calculationResultDiv.innerHTML = `<h3>Valor total: ${totalValue}</h3>`;
+            desgloseDiv.innerHTML = `<p>${breakdown.join(' + ')} = ${totalValue}</p>`;
+            
+            if (ignoredLetters.length > 0) {
+                showMessage(targetWordInput, `Se ignoraron las siguientes letras por no estar en el alfabeto: ${[...new Set(ignoredLetters)].join(', ')}`, 'warning');
+            } else {
+                hideMessage(targetWordInput);
+            }
+
+            resultContainerSection.style.display = 'block';
+            saveToHistoryBtn.style.display = 'block';
+        };
+        
+        // History management
+        const saveToHistory = () => {
+            if (currentResult === null) return;
+            
+            const row = historyTableBody.insertRow(0); // Insert at the beginning
+            row.insertCell(0).textContent = currentSeedPhrase;
+            row.insertCell(1).textContent = currentTargetWord;
+            row.insertCell(2).textContent = currentResult;
+            
+            historySection.style.display = 'block';
+            currentResult = null; // Clear state after saving
+            saveToHistoryBtn.style.display = 'none';
+        };
+        
+        const clearHistory = () => {
+            historyTableBody.innerHTML = '';
+            historySection.style.display = 'none';
+        };
+
+        // UI event handlers
+        generateDictionaryBtn.addEventListener('click', () => {
+            if (!seedPhraseInput.value.trim()) {
+                showMessage(seedPhraseInput, "Por favor, ingresa una frase semilla.", 'warning');
+                return;
+            }
+            generateDictionary();
+            targetWordInput.disabled = false;
+            calculateValueBtn.disabled = false;
+            hideMessage(seedPhraseInput);
+            hideMessage(targetWordInput);
+            resultContainerSection.style.display = 'none';
+        });
+
+        calculateValueBtn.addEventListener('click', calculateValue);
+        saveToHistoryBtn.addEventListener('click', saveToHistory);
+        clearHistoryBtn.addEventListener('click', clearHistory);
+
+        resetBtn.addEventListener('click', () => {
+            seedPhraseInput.value = '';
+            targetWordInput.value = '';
+            targetWordInput.disabled = true;
+            calculateValueBtn.disabled = true;
+            dictionary = {};
+            dictionaryTableBody.innerHTML = '';
+            dictionaryResultSection.style.display = 'none';
+            resultContainerSection.style.display = 'none';
+            hideMessage(seedPhraseInput);
+            hideMessage(targetWordInput);
+            saveToHistoryBtn.style.display = 'none';
+        });
+
+        // Copy and Download JSON logic
+        const copyJson = async () => {
+            try {
+                await navigator.clipboard.writeText(JSON.stringify(dictionary, null, 2));
+                alert('Diccionario copiado al portapapeles.');
+            } catch (err) {
+                console.error('Error al copiar el texto: ', err);
+                alert('Error al copiar el diccionario. Por favor, inténtalo de nuevo.');
+            }
+        };
+
+        const downloadJson = () => {
+            const json = JSON.stringify(dictionary, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'diccionario.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        copyJsonBtn.addEventListener('click', copyJson);
+        downloadJsonBtn.addEventListener('click', downloadJson);
+        
+        // Disable "calculate" button if target word input is empty
+        targetWordInput.addEventListener('input', () => {
+            if (targetWordInput.value.trim()) {
+                calculateValueBtn.disabled = false;
+            } else {
+                calculateValueBtn.disabled = true;
+            }
+        });
+
+        // ===================================
+        // PRUEBAS RÁPIDAS (Auto-checks)
+        // Ejecutar desde la consola del navegador
+        // ===================================
+        console.log("===============================");
+        console.log("Ejecutando pruebas rápidas...");
+        
+        const runTest = (name, testFunction) => {
+            console.log(`- Corriendo prueba: ${name}`);
+            try {
+                testFunction();
+                console.log(`  ✅ Éxito`);
+            } catch (e) {
+                console.error(`  ❌ Fallo: ${e.message}`);
+            }
+        };
+
+        const assert = (condition, message) => {
+            if (!condition) {
+                throw new Error(message || "Assertion failed");
+            }
+        };
+
+        const testGenerateDictionary = (seed, expected) => {
+            seedPhraseInput.value = seed;
+            generateDictionary();
+            const actual = dictionary;
+            const expectedKeys = Object.keys(expected);
+            for (const key of expectedKeys) {
+                assert(actual[key] === expected[key], `Valor de '${key}' no coincide. Esperado: ${expected[key]}, Obtenido: ${actual[key]}`);
+            }
+        };
+
+        const testCalculateValue = (word, expectedValue) => {
+            targetWordInput.value = word;
+            calculateValue();
+            const actualValue = parseInt(document.getElementById('calculationResult').textContent.match(/\d+/)[0]);
+            assert(actualValue === expectedValue, `Valor de '${word}' no coincide. Esperado: ${expectedValue}, Obtenido: ${actualValue}`);
+        };
+
+        // --- Test cases ---
+        runTest("Semilla 'abc' (a:1, b:2, c:3, d:4)", () => {
+            testGenerateDictionary('abc', { 'a': 1, 'b': 2, 'c': 3, 'd': 4 });
+        });
+
+        runTest("Semilla 'abaca' (a:1, b:2, c:3, d:4)", () => {
+            testGenerateDictionary('abaca', { 'a': 1, 'b': 2, 'c': 3, 'd': 4 });
+        });
+
+        runTest("Palabra 'dad' con diccionario de 'abaca' (4+1+4=9)", () => {
+            seedPhraseInput.value = 'abaca';
+            generateDictionary();
+            testCalculateValue('dad', 9);
+        });
+
+        runTest("Caracteres con acento 'áéí' mapean como a,e,i", () => {
+            seedPhraseInput.value = 'áéí';
+            generateDictionary();
+            assert(dictionary['a'] === 1 && dictionary['e'] === 2 && dictionary['i'] === 3, "Los acentos no se normalizaron correctamente.");
+        });
+
+        console.log("Pruebas finalizadas.");
+        console.log("===============================");
+    </script>
+</body>
+</html>
