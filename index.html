@@ -196,7 +196,7 @@
         }
         
         /* Ocultar elementos inicialmente */
-        #dictionaryResult, #resultContainer, #extraButtons, #saveToHistoryBtn, #historySection {
+        #dictionaryResult, #resultContainer, #extraButtons, #saveToHistoryBtn, #historySection, #reduceValuesBtn {
             display: none;
         }
     </style>
@@ -233,6 +233,7 @@
                 <button id="copyJsonBtn" class="secondary">Copiar diccionario (JSON)</button>
                 <button id="downloadJsonBtn" class="secondary">Descargar diccionario (JSON)</button>
             </div>
+            <button id="reduceValuesBtn" class="secondary" style="margin-top: 15px;">Reducir valores</button>
             <div style="overflow-x: auto;">
                 <table id="dictionaryTable">
                     <thead>
@@ -272,6 +273,7 @@
                             <th>Frase Semilla</th>
                             <th>Palabra</th>
                             <th>Valor</th>
+                            <th>Tipo</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -300,12 +302,17 @@
         const historySection = document.getElementById('historySection');
         const historyTableBody = document.querySelector('#historyTable tbody');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const reduceValuesBtn = document.getElementById('reduceValuesBtn');
 
         // Global state
-        let dictionary = {};
+        let fullDictionary = {};
+        let reducedDictionary = {};
+        let isDictionaryReduced = false;
         let currentSeedPhrase = '';
         let currentTargetWord = '';
         let currentResult = null;
+        let calculationType = 'Normal';
+
         const baseAlphabets = {
             'a-z': 'abcdefghijklmnopqrstuvwxyz',
             'a-z-ñ': 'abcdefghijklmnopqrstuvwxyzñ'
@@ -343,14 +350,14 @@
             const uniqueLetters = new Set();
             let ignoredCount = 0;
 
-            dictionary = {};
+            fullDictionary = {};
             let value = 1;
 
             // Process seed phrase
             for (const char of normalizedPhrase) {
                 if (fullAlphabet.includes(char) && !uniqueLetters.has(char)) {
                     uniqueLetters.add(char);
-                    dictionary[char] = value++;
+                    fullDictionary[char] = value++;
                 } else if (!fullAlphabet.includes(char) && char !== ' ') {
                     ignoredCount++;
                 }
@@ -359,9 +366,12 @@
             // Complete the dictionary with the rest of the alphabet
             for (const char of fullAlphabet) {
                 if (!uniqueLetters.has(char)) {
-                    dictionary[char] = value++;
+                    fullDictionary[char] = value++;
                 }
             }
+            
+            // Generate the reduced dictionary
+            reduceDictionaryValues();
 
             // Display dictionary in a table
             displayDictionary();
@@ -376,10 +386,24 @@
             currentSeedPhrase = seedPhrase;
         };
 
+        // New logic to reduce values
+        const reduceDictionaryValues = () => {
+            reducedDictionary = {};
+            for (const letter in fullDictionary) {
+                const value = fullDictionary[letter];
+                if (value === 11 || value === 22) {
+                    reducedDictionary[letter] = value;
+                } else {
+                    reducedDictionary[letter] = value.toString().split('').reduce((sum, digit) => sum + parseInt(digit), 0);
+                }
+            }
+        };
+
         const displayDictionary = () => {
+            const dictionaryToDisplay = isDictionaryReduced ? reducedDictionary : fullDictionary;
             dictionaryTableBody.innerHTML = '';
             // Convert dictionary to an array of [key, value] pairs and sort by value
-            const sortedEntries = Object.entries(dictionary).sort((a, b) => a[1] - b[1]);
+            const sortedEntries = Object.entries(dictionaryToDisplay).sort((a, b) => a[1] - b[1]);
 
             sortedEntries.forEach(([letter, value]) => {
                 const row = dictionaryTableBody.insertRow();
@@ -388,10 +412,12 @@
             });
             dictionaryResultSection.style.display = 'block';
             extraButtonsContainer.style.display = 'flex';
+            reduceValuesBtn.style.display = 'block';
         };
 
         // Core logic: calculate the word's value
         const calculateValue = () => {
+            const dictionaryUsed = isDictionaryReduced ? reducedDictionary : fullDictionary;
             const targetWord = targetWordInput.value;
             const normalizedWord = normalizeText(targetWord);
             let totalValue = 0;
@@ -400,7 +426,7 @@
             const selectedAlphabetKey = alphabetSelect.value;
             const fullAlphabet = baseAlphabets[selectedAlphabetKey];
 
-            if (Object.keys(dictionary).length === 0) {
+            if (Object.keys(dictionaryUsed).length === 0) {
                 showMessage(targetWordInput, "Primero debes generar el diccionario.", 'danger');
                 return;
             }
@@ -411,8 +437,8 @@
             }
 
             for (const char of normalizedWord) {
-                if (dictionary.hasOwnProperty(char)) {
-                    const value = dictionary[char];
+                if (dictionaryUsed.hasOwnProperty(char)) {
+                    const value = dictionaryUsed[char];
                     totalValue += value;
                     breakdown.push(`${char}(${value})`);
                 } else if (fullAlphabet.includes(char)) {
@@ -425,6 +451,7 @@
             // Display results
             currentResult = totalValue;
             currentTargetWord = targetWord;
+            calculationType = isDictionaryReduced ? 'Reducido' : 'Normal';
             calculationResultDiv.innerHTML = `<h3>Valor total: ${totalValue}</h3>`;
             desgloseDiv.innerHTML = `<p>${breakdown.join(' + ')} = ${totalValue}</p>`;
             
@@ -446,6 +473,7 @@
             row.insertCell(0).textContent = currentSeedPhrase;
             row.insertCell(1).textContent = currentTargetWord;
             row.insertCell(2).textContent = currentResult;
+            row.insertCell(3).textContent = calculationType;
             
             historySection.style.display = 'block';
             currentResult = null; // Clear state after saving
@@ -463,12 +491,24 @@
                 showMessage(seedPhraseInput, "Por favor, ingresa una frase semilla.", 'warning');
                 return;
             }
+            isDictionaryReduced = false;
+            reduceValuesBtn.textContent = 'Reducir valores';
             generateDictionary();
             targetWordInput.disabled = false;
             calculateValueBtn.disabled = false;
             hideMessage(seedPhraseInput);
             hideMessage(targetWordInput);
             resultContainerSection.style.display = 'none';
+        });
+
+        reduceValuesBtn.addEventListener('click', () => {
+            isDictionaryReduced = !isDictionaryReduced;
+            reduceValuesBtn.textContent = isDictionaryReduced ? 'Restaurar valores' : 'Reducir valores';
+            displayDictionary();
+            // Recalculate if there's a word in the input
+            if (targetWordInput.value.trim()) {
+                calculateValue();
+            }
         });
 
         calculateValueBtn.addEventListener('click', calculateValue);
@@ -480,19 +520,24 @@
             targetWordInput.value = '';
             targetWordInput.disabled = true;
             calculateValueBtn.disabled = true;
-            dictionary = {};
+            fullDictionary = {};
+            reducedDictionary = {};
             dictionaryTableBody.innerHTML = '';
             dictionaryResultSection.style.display = 'none';
             resultContainerSection.style.display = 'none';
             hideMessage(seedPhraseInput);
             hideMessage(targetWordInput);
             saveToHistoryBtn.style.display = 'none';
+            reduceValuesBtn.style.display = 'none';
+            isDictionaryReduced = false;
+            reduceValuesBtn.textContent = 'Reducir valores';
         });
 
         // Copy and Download JSON logic
         const copyJson = async () => {
+            const dictionaryToCopy = isDictionaryReduced ? reducedDictionary : fullDictionary;
             try {
-                await navigator.clipboard.writeText(JSON.stringify(dictionary, null, 2));
+                await navigator.clipboard.writeText(JSON.stringify(dictionaryToCopy, null, 2));
                 alert('Diccionario copiado al portapapeles.');
             } catch (err) {
                 console.error('Error al copiar el texto: ', err);
@@ -501,12 +546,13 @@
         };
 
         const downloadJson = () => {
-            const json = JSON.stringify(dictionary, null, 2);
+            const dictionaryToDownload = isDictionaryReduced ? reducedDictionary : fullDictionary;
+            const json = JSON.stringify(dictionaryToDownload, null, 2);
             const blob = new Blob([json], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'diccionario.json';
+            a.download = `diccionario_${isDictionaryReduced ? 'reducido' : 'normal'}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -548,17 +594,19 @@
             }
         };
 
-        const testGenerateDictionary = (seed, expected) => {
+        const testGenerateDictionary = (seed, expected, reducedExpected = null) => {
             seedPhraseInput.value = seed;
             generateDictionary();
-            const actual = dictionary;
-            const expectedKeys = Object.keys(expected);
-            for (const key of expectedKeys) {
-                assert(actual[key] === expected[key], `Valor de '${key}' no coincide. Esperado: ${expected[key]}, Obtenido: ${actual[key]}`);
+            assert(JSON.stringify(fullDictionary) === JSON.stringify(expected), `Diccionario normal no coincide.`);
+            if (reducedExpected) {
+                reduceValuesBtn.click(); // Toggle to reduced
+                assert(JSON.stringify(reducedDictionary) === JSON.stringify(reducedExpected), `Diccionario reducido no coincide.`);
+                reduceValuesBtn.click(); // Toggle back
             }
         };
 
-        const testCalculateValue = (word, expectedValue) => {
+        const testCalculateValue = (word, expectedValue, isReduced = false) => {
+            isDictionaryReduced = isReduced;
             targetWordInput.value = word;
             calculateValue();
             const actualValue = parseInt(document.getElementById('calculationResult').textContent.match(/\d+/)[0]);
@@ -566,24 +614,39 @@
         };
 
         // --- Test cases ---
-        runTest("Semilla 'abc' (a:1, b:2, c:3, d:4)", () => {
-            testGenerateDictionary('abc', { 'a': 1, 'b': 2, 'c': 3, 'd': 4 });
+        runTest("Semilla 'abc' (a:1, b:2, c:3, d:4) y reducción", () => {
+            testGenerateDictionary('abc', { 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 10, 'k': 11, 'l': 12, 'm': 13, 'n': 14, 'o': 15, 'p': 16, 'q': 17, 'r': 18, 's': 19, 't': 20, 'u': 21, 'v': 22, 'w': 23, 'x': 24, 'y': 25, 'z': 26 },
+                { 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 1, 'k': 11, 'l': 3, 'm': 4, 'n': 5, 'o': 6, 'p': 7, 'q': 8, 'r': 9, 's': 10, 't': 2, 'u': 3, 'v': 22, 'w': 5, 'x': 6, 'y': 7, 'z': 8 });
         });
 
-        runTest("Semilla 'abaca' (a:1, b:2, c:3, d:4)", () => {
-            testGenerateDictionary('abaca', { 'a': 1, 'b': 2, 'c': 3, 'd': 4 });
+        runTest("Semilla 'abaca' (a:1, b:2, c:3, d:4) y reducción", () => {
+            testGenerateDictionary('abaca', { 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 10, 'k': 11, 'l': 12, 'm': 13, 'n': 14, 'o': 15, 'p': 16, 'q': 17, 'r': 18, 's': 19, 't': 20, 'u': 21, 'v': 22, 'w': 23, 'x': 24, 'y': 25, 'z': 26 },
+                { 'a': 1, 'b': 2, 'c': 3, 'd': 4, 'e': 5, 'f': 6, 'g': 7, 'h': 8, 'i': 9, 'j': 1, 'k': 11, 'l': 3, 'm': 4, 'n': 5, 'o': 6, 'p': 7, 'q': 8, 'r': 9, 's': 10, 't': 2, 'u': 3, 'v': 22, 'w': 5, 'x': 6, 'y': 7, 'z': 8 });
         });
-
-        runTest("Palabra 'dad' con diccionario de 'abaca' (4+1+4=9)", () => {
+        
+        runTest("Palabra 'dad' con diccionario normal de 'abaca' (4+1+4=9)", () => {
             seedPhraseInput.value = 'abaca';
             generateDictionary();
             testCalculateValue('dad', 9);
         });
 
+        runTest("Palabra 'saco' con diccionario normal de 'casa' (19+2+1+6=28)", () => {
+            seedPhraseInput.value = 'casa';
+            generateDictionary();
+            testCalculateValue('saco', 28);
+        });
+
+        runTest("Palabra 'saco' con diccionario REDUCIDO de 'casa' (10+2+1+6=19)", () => {
+            seedPhraseInput.value = 'casa';
+            generateDictionary();
+            reduceValuesBtn.click(); // Reducir
+            testCalculateValue('saco', 19, true);
+        });
+
         runTest("Caracteres con acento 'áéí' mapean como a,e,i", () => {
             seedPhraseInput.value = 'áéí';
             generateDictionary();
-            assert(dictionary['a'] === 1 && dictionary['e'] === 2 && dictionary['i'] === 3, "Los acentos no se normalizaron correctamente.");
+            assert(fullDictionary['a'] === 1 && fullDictionary['e'] === 2 && fullDictionary['i'] === 3, "Los acentos no se normalizaron correctamente.");
         });
 
         console.log("Pruebas finalizadas.");
